@@ -294,6 +294,54 @@ describe('utils', () => {
           ...borderOutput,
         };
 
+        it('should expand array values into indexed tokens', () => {
+          const expanded = expandTokens(
+            convertTokenData(
+              {
+                easing: {
+                  type: 'cubicBezier',
+                  value: [0.42, 0, 0.58, 1],
+                  path: ['easing'],
+                },
+              },
+              { output: 'map' },
+            ),
+            {
+              expand: true,
+              usesDtcg: false,
+            },
+          );
+
+          expect(convertTokenData(expanded, { output: 'object' })).to.eql({
+            easing: {
+              1: {
+                key: '{easing.1}',
+                type: 'cubicBezier',
+                value: 0.42,
+                path: ['easing', '1'],
+              },
+              2: {
+                key: '{easing.2}',
+                type: 'cubicBezier',
+                value: 0,
+                path: ['easing', '2'],
+              },
+              3: {
+                key: '{easing.3}',
+                type: 'cubicBezier',
+                value: 0.58,
+                path: ['easing', '3'],
+              },
+              4: {
+                key: '{easing.4}',
+                type: 'cubicBezier',
+                value: 1,
+                path: ['easing', '4'],
+              },
+            },
+          });
+        });
+
         it('should not expand tokens when expand is false', () => {
           const expanded = expandTokens(borderInput, {
             expand: false,
@@ -489,9 +537,16 @@ describe('utils', () => {
             },
             stroke: {
               dashArray: {
-                key: '{stroke.dashArray}',
-                value: ['0.5rem', '0.25rem'],
-                type: 'dimension',
+                1: {
+                  key: '{stroke.dashArray.1}',
+                  value: '0.5rem',
+                  type: 'dimension',
+                },
+                2: {
+                  key: '{stroke.dashArray.2}',
+                  value: '0.25rem',
+                  type: 'dimension',
+                },
               },
               lineCap: {
                 key: '{stroke.lineCap}',
@@ -507,9 +562,16 @@ describe('utils', () => {
               // breaking the original reference
               style: {
                 dashArray: {
-                  key: '{border.style.dashArray}',
-                  value: ['0.5rem', '0.25rem'],
-                  type: 'dimension',
+                  1: {
+                    key: '{border.style.dashArray.1}',
+                    value: '0.5rem',
+                    type: 'dimension',
+                  },
+                  2: {
+                    key: '{border.style.dashArray.2}',
+                    value: '0.25rem',
+                    type: 'dimension',
+                  },
                 },
                 lineCap: {
                   key: '{border.style.lineCap}',
@@ -604,6 +666,90 @@ describe('utils', () => {
                   type: 'color',
                   value: '#ccc',
                 },
+              },
+            },
+          });
+        });
+
+        it('should expand array properties in composite tokens', () => {
+          const strokeStyleInput = {
+            stroke: {
+              type: 'strokeStyle',
+              value: {
+                dashArray: ['0.5rem', '0.25rem'],
+                lineCap: 'round',
+              },
+              path: ['stroke'],
+            },
+          };
+
+          const expanded = expandTokens(convertTokenData(strokeStyleInput, { output: 'map' }), {
+            expand: true,
+            usesDtcg: false,
+          });
+
+          expect(convertTokenData(expanded, { output: 'object' })).to.eql({
+            stroke: {
+              dashArray: {
+                1: {
+                  key: '{stroke.dashArray.1}',
+                  type: 'dimension',
+                  value: '0.5rem',
+                  path: ['stroke', 'dashArray', '1'],
+                },
+                2: {
+                  key: '{stroke.dashArray.2}',
+                  type: 'dimension',
+                  value: '0.25rem',
+                  path: ['stroke', 'dashArray', '2'],
+                },
+              },
+              lineCap: {
+                key: '{stroke.lineCap}',
+                type: 'lineCap',
+                value: 'round',
+                path: ['stroke', 'lineCap'],
+              },
+            },
+          });
+        });
+
+        it('should preserve empty array values', () => {
+          const input = {
+            easing: {
+              type: 'cubicBezier',
+              value: [],
+            },
+            stroke: {
+              type: 'strokeStyle',
+              value: {
+                dashArray: [],
+                lineCap: 'round',
+              },
+            },
+          };
+
+          const expanded = expandTokens(convertTokenData(input, { output: 'map' }), {
+            expand: true,
+            usesDtcg: false,
+          });
+
+          expect(convertTokenData(expanded, { output: 'object' })).to.eql({
+            easing: {
+              key: '{easing}',
+              type: 'cubicBezier',
+              value: [],
+            },
+            stroke: {
+              dashArray: {
+                key: '{stroke.dashArray}',
+                type: 'dimension',
+                value: [],
+              },
+              lineCap: {
+                key: '{stroke.lineCap}',
+                type: 'lineCap',
+                value: 'round',
               },
             },
           });
