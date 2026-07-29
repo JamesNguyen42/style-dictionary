@@ -49,6 +49,29 @@ There are 3 types of transforms: `attribute`, `name`, and `value`.
 
 You can define custom transforms with the [`registerTransform`](/reference/api#registertransform). Style Dictionary adds some [default metadata](/info/tokens#default-design-token-metadata) to each design token to provide context that may be useful for some transforms.
 
+### Stop remaining transforms for a token
+
+By default, an error thrown by a transform is reported and the remaining transforms still run. Throw
+`StopTransformError` when a validation failure means the current token should skip the rest of its
+transform chain. Changes from earlier transforms are preserved, and other tokens continue normally.
+
+```javascript title="build-tokens.js"
+import StyleDictionary from 'style-dictionary';
+import { StopTransformError } from 'style-dictionary/utils';
+
+StyleDictionary.registerTransform({
+  name: 'dimension/validate',
+  type: 'value',
+  filter: (token) => token.type === 'dimension',
+  transform: (token) => {
+    if (!isValidDimension(token.value)) {
+      throw new StopTransformError(`Invalid dimension: ${token.value}`);
+    }
+    return token.value;
+  },
+});
+```
+
 ## Transitive Transforms
 
 You can define transitive transforms which allow you to transform a referenced value. Normally, value transforms only transform non-referenced values and because transforms happen before references are resolved, the transformed value is then used to resolve references.

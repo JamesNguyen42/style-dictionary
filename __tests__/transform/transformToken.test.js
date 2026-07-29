@@ -1,8 +1,11 @@
 import { expect } from 'chai';
 import transformToken from '../../lib/transform/token.js';
 import { transformTypes } from '../../lib/enums/index.js';
+import { StopTransformError } from 'style-dictionary/utils';
+import GroupMessages from '../../lib/utils/groupMessages.js';
 
 const { value: transformTypeValue, name, attribute } = transformTypes;
+const TRANSFORM_ERRORS = GroupMessages.GROUP.TransformErrors;
 
 const config = {
   transforms: [
@@ -34,6 +37,10 @@ const config = {
 
 describe('transform', () => {
   describe('token', () => {
+    afterEach(() => {
+      GroupMessages.clear(TRANSFORM_ERRORS);
+    });
+
     it('transform token and apply transforms', async () => {
       const test = await transformToken({ attributes: { baz: 'blah' } }, config, {});
       expect(test).to.have.nested.property('attributes.bar', 'foo');
@@ -57,11 +64,63 @@ describe('transform', () => {
                 throw 123;
               },
             },
+            {
+              type: transformTypeValue,
+              transform: function () {
+                return 'ghi';
+              },
+            },
           ],
         },
         {},
       );
-      expect(test).to.have.property('value', 'def');
+      expect(test).to.have.property('value', 'ghi');
+    });
+
+    it('stops remaining transforms when a StopTransformError is thrown', async () => {
+      for (const transformType of [attribute, name, transformTypeValue]) {
+        let laterTransformRan = false;
+        const test = await transformToken(
+          {
+            name: 'foo-bar',
+            value: 'abc',
+            path: ['foo', 'bar'],
+            original: { value: 'abc' },
+          },
+          {
+            transforms: [
+              {
+                name: 'earlier',
+                type: transformTypeValue,
+                transform: function () {
+                  return 'def';
+                },
+              },
+              {
+                name: 'validation',
+                type: transformType,
+                transform: function () {
+                  throw new StopTransformError('invalid token');
+                },
+              },
+              {
+                name: 'later',
+                type: transformTypeValue,
+                transform: function () {
+                  laterTransformRan = true;
+                  return 'ghi';
+                },
+              },
+            ],
+          },
+          {},
+        );
+
+        expect(laterTransformRan, `${transformType} transform should stop the chain`).to.equal(
+          false,
+        );
+        expect(test).to.have.property('value', 'def');
+      }
     });
 
     // This allows transformObject utility to then consider this token's transformation undefined and thus "deferred"
