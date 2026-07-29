@@ -5,6 +5,7 @@ import { restore, stubMethod } from 'hanbi';
 import { buildPath, cleanConsoleOutput } from './_constants.js';
 import { resolve } from '../lib/resolve.js';
 import { clearOutput } from '../__tests__/__helpers.js';
+import commonFormats from '../lib/common/formats.js';
 import { outputReferencesFilter } from '../lib/utils/references/outputReferencesFilter.js';
 import { outputReferencesTransformed } from '../lib/utils/index.js';
 import {
@@ -218,6 +219,90 @@ describe('integration', async () => {
       });
       await sd.buildAllPlatforms();
       await expect(stub.lastCall.args.map(cleanConsoleOutput).join('\n')).to.matchSnapshot();
+    });
+
+    it('should keep filtered reference warnings scoped to the file that caused them', async () => {
+      let markAllFormatted;
+      const allFormatted = new Promise((resolve) => {
+        markAllFormatted = resolve;
+      });
+      let markFilteredFormatted;
+      const filteredFormatted = new Promise((resolve) => {
+        markFilteredFormatted = resolve;
+      });
+
+      const sd = new StyleDictionary({
+        log: { verbosity: verbose },
+        tokens: {
+          colors: {
+            red: {
+              value: '#ff0000',
+              type: 'color',
+            },
+            danger: {
+              value: '{colors.red}',
+              type: 'color',
+            },
+          },
+          components: {
+            foo: {
+              value: '1px',
+              type: 'dimension',
+            },
+          },
+        },
+        hooks: {
+          formats: {
+            all: async (args) => {
+              await filteredFormatted;
+              const output = await commonFormats[cssVariables](args);
+              markAllFormatted();
+              return output;
+            },
+            filtered: async (args) => {
+              const output = await commonFormats[cssVariables](args);
+              markFilteredFormatted();
+              await allFormatted;
+              return output;
+            },
+          },
+        },
+        platforms: {
+          css: {
+            transformGroup: css,
+            buildPath,
+            files: [
+              {
+                destination: 'all.css',
+                format: 'all',
+                filter: (token) => token.path.join('.') !== 'components.foo',
+                options: {
+                  outputReferences: true,
+                },
+              },
+              {
+                destination: 'filtered.css',
+                format: 'filtered',
+                filter: (token) => token.path.join('.') === 'colors.danger',
+                options: {
+                  outputReferences: true,
+                },
+              },
+            ],
+          },
+        },
+      });
+
+      await sd.buildAllPlatforms();
+
+      const filteredReferenceWarnings = Array.from(stub.calls)
+        .flatMap((call) => call.args)
+        .map(cleanConsoleOutput)
+        .filter((log) => log.includes('filtered out token references were found'));
+
+      expect(filteredReferenceWarnings).to.have.length(1);
+      expect(filteredReferenceWarnings[0]).to.include('While building filtered.css');
+      expect(filteredReferenceWarnings[0]).to.include('colors.red');
     });
 
     it('should properly reference tokens in dtcg format', async () => {
