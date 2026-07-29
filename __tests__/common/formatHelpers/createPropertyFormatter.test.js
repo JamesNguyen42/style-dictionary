@@ -650,6 +650,75 @@ describe('common', () => {
           );
         });
       });
+
+      describe('Sass asset values', () => {
+        const base64 = 'YWJjZA==';
+        const asset = {
+          original: {
+            value: 'assets/icon.svg',
+            type: 'asset',
+          },
+          name: 'asset-icon',
+          path: ['asset', 'icon'],
+          value: base64,
+          type: 'asset',
+        };
+
+        it('quotes raw asset values', () => {
+          const formatter = createPropertyFormatter({
+            dictionary: { tokens: { asset } },
+            format: sass,
+          });
+
+          expect(formatter(asset)).to.equal(`$asset-icon: "${base64}";`);
+        });
+
+        it('quotes DTCG asset values', () => {
+          const dtcgAsset = {
+            original: {
+              $value: 'assets/icon.svg',
+              $type: 'asset',
+            },
+            name: 'asset-icon',
+            path: ['asset', 'icon'],
+            $value: base64,
+            $type: 'asset',
+          };
+          const formatter = createPropertyFormatter({
+            dictionary: { tokens: { asset: dtcgAsset } },
+            format: sass,
+            usesDtcg: true,
+          });
+
+          expect(formatter(dtcgAsset)).to.equal(`$asset-icon: "${base64}";`);
+        });
+
+        it('preserves Sass expressions and already-quoted values', () => {
+          const formatter = createPropertyFormatter({
+            dictionary: { tokens: { asset } },
+            format: sass,
+          });
+
+          expect(formatter({ ...asset, value: 'url("icon.svg")' })).to.equal(
+            '$asset-icon: url("icon.svg");',
+          );
+          expect(formatter({ ...asset, value: '"already quoted"' })).to.equal(
+            '$asset-icon: "already quoted";',
+          );
+          expect(formatter({ ...asset, value: '$asset-reference' })).to.equal(
+            '$asset-icon: $asset-reference;',
+          );
+        });
+
+        it('leaves non-Sass formats unchanged', () => {
+          const formatter = createPropertyFormatter({
+            dictionary: { tokens: { asset } },
+            format: css,
+          });
+
+          expect(formatter(asset)).to.equal(`  --asset-icon: ${base64};`);
+        });
+      });
     });
   });
 });
