@@ -122,4 +122,49 @@ describe('formats', () => {
       });
     });
   }
+
+  it('should group comma-separated values in a flat Sass map', async () => {
+    const file = {
+      destination: 'output.scss',
+      format: fileFormats.scssMapFlat,
+    };
+    const commaSeparatedTokens = [
+      {
+        value: "'Montserrat', Arial, sans-serif",
+        original: {
+          value: ['Montserrat', 'Arial', 'sans-serif'],
+        },
+        name: 'font-family-brand',
+        path: ['font', 'family', 'brand'],
+      },
+      {
+        value: 'cubic-bezier(0, 0, 0.2, 1)',
+        original: {
+          value: [0, 0, 0.2, 1],
+        },
+        name: 'time-curve-in',
+        path: ['time', 'curve', 'in'],
+      },
+      {
+        value: '"Hello, world"',
+        original: {
+          value: 'Hello, world',
+        },
+        name: 'content-greeting',
+        path: ['content', 'greeting'],
+      },
+    ];
+    const output = await formats[fileFormats.scssMapFlat](
+      createFormatArgs({
+        dictionary: { tokens: {}, allTokens: commaSeparatedTokens },
+        file,
+        platform: {},
+      }),
+    );
+
+    expect(output).to.include("'font-family-brand': ('Montserrat', Arial, sans-serif)");
+    expect(output).to.include("'time-curve-in': cubic-bezier(0, 0, 0.2, 1)");
+    expect(output).to.include(`'content-greeting': "Hello, world"`);
+    expect(() => compileString(output)).not.to.throw();
+  });
 });
