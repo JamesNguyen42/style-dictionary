@@ -190,6 +190,69 @@ describe('integration', async () => {
       ).to.matchSnapshot();
     });
 
+    it('should not warn when multiple output tokens transitively reference filtered tokens', async () => {
+      const sd = new StyleDictionary({
+        log: { verbosity: verbose },
+        tokens: {
+          palette: {
+            color: {
+              gray: {
+                $type: 'color',
+                $value: '#f6f6f8',
+              },
+            },
+          },
+          brand: {
+            color: {
+              foreground: {
+                $type: 'color',
+                $value: '{palette.color.gray}',
+              },
+            },
+          },
+          base: {
+            color: {
+              primary: {
+                $type: 'color',
+                $value: '{brand.color.foreground}',
+              },
+              secondary: {
+                $type: 'color',
+                $value: '{brand.color.foreground}',
+              },
+            },
+          },
+        },
+        platforms: {
+          css: {
+            transformGroup: css,
+            buildPath,
+            files: [
+              {
+                destination: 'transitivelyFilteredVariables.css',
+                format: cssVariables,
+                filter: (token) => token.path[0] === 'base',
+                options: {
+                  outputReferences: outputReferencesFilter,
+                },
+              },
+            ],
+          },
+        },
+      });
+
+      await sd.buildAllPlatforms();
+
+      const output = fs.readFileSync(resolve(`${buildPath}transitivelyFilteredVariables.css`), {
+        encoding: 'UTF-8',
+      });
+      expect(output).to.include('--base-color-primary: #f6f6f8;');
+      expect(output).to.include('--base-color-secondary: #f6f6f8;');
+      expect(
+        [...stub.calls].map((call) => call.args.map(cleanConsoleOutput)).join('\n'),
+      ).not.to.include('filtered out token references');
+    });
+
     it('should warn the user if filters out references with a detailed message when using verbose logging', async () => {
       const sd = new StyleDictionary({
         log: { verbosity: verbose },
